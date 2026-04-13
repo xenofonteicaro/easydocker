@@ -126,6 +126,10 @@ func (m model) renderHeader() string {
 }
 
 func (m model) renderFooter() string {
+	if m.actionStatus != "" {
+		innerWidth := max(1, m.width-m.styles.Footer.GetHorizontalFrameSize())
+		return m.styles.Footer.Render(util.ConstrainLine(m.actionStatus, innerWidth))
+	}
 	return chrome.RenderFooter(chrome.FooterInput{
 		Width:     m.width,
 		HelpSpecs: chrome.FooterHelpSpecs(m.screen == screenModeLogs, m.activeTab == tabContainers),

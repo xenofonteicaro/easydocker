@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"io"
 	"reflect"
 	"testing"
 	"time"
@@ -13,6 +14,9 @@ type mockRepository struct {
 	loadSupportingResourcesFn func(ctx context.Context) (Snapshot, error)
 	loadContainerMetricsFn    func(ctx context.Context, rows []ContainerRow) (map[string]ContainerMetrics, float64, uint64, error)
 	loadContainerLiveDataFn   func(ctx context.Context, containerID string, previousCPU, previousMem []float64, tail int) (ContainerLiveData, error)
+	startContainerFn          func(ctx context.Context, id string) error
+	stopContainerFn           func(ctx context.Context, id string) error
+	restartContainerFn        func(ctx context.Context, id string) error
 
 	calls []string
 }
@@ -47,6 +51,34 @@ func (m *mockRepository) LoadContainerLiveData(ctx context.Context, containerID 
 		return m.loadContainerLiveDataFn(ctx, containerID, previousCPU, previousMem, tail)
 	}
 	return ContainerLiveData{}, nil
+}
+
+func (m *mockRepository) ExecShell(_ context.Context, _ string, _ io.Reader, _, _ io.Writer) error {
+	return nil
+}
+
+func (m *mockRepository) StartContainer(ctx context.Context, id string) error {
+	m.calls = append(m.calls, "start:"+id)
+	if m.startContainerFn != nil {
+		return m.startContainerFn(ctx, id)
+	}
+	return nil
+}
+
+func (m *mockRepository) StopContainer(ctx context.Context, id string) error {
+	m.calls = append(m.calls, "stop:"+id)
+	if m.stopContainerFn != nil {
+		return m.stopContainerFn(ctx, id)
+	}
+	return nil
+}
+
+func (m *mockRepository) RestartContainer(ctx context.Context, id string) error {
+	m.calls = append(m.calls, "restart:"+id)
+	if m.restartContainerFn != nil {
+		return m.restartContainerFn(ctx, id)
+	}
+	return nil
 }
 
 func TestServiceLoadSnapshot_ComposesDataAndMetrics(t *testing.T) {
@@ -238,5 +270,86 @@ func assertDurationApprox(t *testing.T, got, want, tolerance time.Duration) {
 	max := want + tolerance
 	if got < min || got > max {
 		t.Fatalf("duration = %v, want within [%v, %v]", got, min, max)
+	}
+}
+
+func TestService_StartContainer_CallsRepoWithID(t *testing.T) {
+	repo := &mockRepository{}
+	svc := NewService(repo)
+
+	err := svc.StartContainer("abc123")
+
+	if err != nil {
+		t.Fatalf("StartContainer() error = %v, want nil", err)
+	}
+	if len(repo.calls) != 1 || repo.calls[0] != "start:abc123" {
+		t.Fatalf("repo.calls = %v, want [start:abc123]", repo.calls)
+	}
+}
+
+func TestService_StartContainer_PropagatesError(t *testing.T) {
+	repo := &mockRepository{startContainerFn: func(_ context.Context, _ string) error {
+		return errors.New("daemon not reachable")
+	}}
+	svc := NewService(repo)
+
+	err := svc.StartContainer("abc123")
+
+	if err == nil {
+		t.Fatal("StartContainer() error = nil, want non-nil")
+	}
+}
+
+func TestService_StopContainer_CallsRepoWithID(t *testing.T) {
+	repo := &mockRepository{}
+	svc := NewService(repo)
+
+	err := svc.StopContainer("def456")
+
+	if err != nil {
+		t.Fatalf("StopContainer() error = %v, want nil", err)
+	}
+	if len(repo.calls) != 1 || repo.calls[0] != "stop:def456" {
+		t.Fatalf("repo.calls = %v, want [stop:def456]", repo.calls)
+	}
+}
+
+func TestService_StopContainer_PropagatesError(t *testing.T) {
+	repo := &mockRepository{stopContainerFn: func(_ context.Context, _ string) error {
+		return errors.New("container not found")
+	}}
+	svc := NewService(repo)
+
+	err := svc.StopContainer("def456")
+
+	if err == nil {
+		t.Fatal("StopContainer() error = nil, want non-nil")
+	}
+}
+
+func TestService_RestartContainer_CallsRepoWithID(t *testing.T) {
+	repo := &mockRepository{}
+	svc := NewService(repo)
+
+	err := svc.RestartContainer("ghi789")
+
+	if err != nil {
+		t.Fatalf("RestartContainer() error = %v, want nil", err)
+	}
+	if len(repo.calls) != 1 || repo.calls[0] != "restart:ghi789" {
+		t.Fatalf("repo.calls = %v, want [restart:ghi789]", repo.calls)
+	}
+}
+
+func TestService_RestartContainer_PropagatesError(t *testing.T) {
+	repo := &mockRepository{restartContainerFn: func(_ context.Context, _ string) error {
+		return errors.New("restart failed")
+	}}
+	svc := NewService(repo)
+
+	err := svc.RestartContainer("ghi789")
+
+	if err == nil {
+		t.Fatal("RestartContainer() error = nil, want non-nil")
 	}
 }

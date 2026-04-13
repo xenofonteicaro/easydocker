@@ -33,6 +33,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleLogsResultMsg(msg)
 	case execDoneMsg:
 		return m, nil
+	case containerActionDoneMsg:
+		return m.handleContainerActionDoneMsg(msg)
 	case tickMsg:
 		return m.handleTickMsg(msg)
 	case spinner.TickMsg:
@@ -84,6 +86,12 @@ func (m model) handleWindowSizeMsg(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) handleKey(key string) (tea.Model, tea.Cmd) {
+	if key == "s" || key == "x" || key == "r" {
+		if newModel, cmd, handled := m.handleContainerActionKey(key); handled {
+			return newModel, cmd
+		}
+	}
+
 	route := mode.RouteRootKey(key, toModeScreen(m.screen))
 	switch route {
 	case mode.RouteQuit:
@@ -96,6 +104,64 @@ func (m model) handleKey(key string) (tea.Model, tea.Cmd) {
 		return m.handleBrowseKey(key)
 	}
 
+	return m, nil
+}
+
+func (m model) handleContainerActionKey(key string) (tea.Model, tea.Cmd, bool) {
+	var cont core.ContainerRow
+	var ok bool
+
+	if m.screen == screenModeLogs {
+		cont, ok = m.selectedLogsContainer()
+	} else if m.activeTab == tabContainers {
+		cont, ok = m.selectedContainer()
+	} else {
+		return m, nil, false
+	}
+
+	if !ok {
+		return m, nil, true
+	}
+
+	state := strings.ToLower(cont.State)
+	var action, status string
+
+	switch key {
+	case "s":
+		if state != "exited" && state != "stopped" && state != "created" {
+			return m, nil, true
+		}
+		action, status = "start", "Starting container..."
+	case "x":
+		if state != "running" && state != "paused" && state != "restarting" {
+			return m, nil, true
+		}
+		action, status = "stop", "Stopping container..."
+	case "r":
+		action, status = "restart", "Restarting container..."
+	default:
+		return m, nil, false
+	}
+
+	m.actionStatus = status
+	m.actionPending = true
+	return m, m.containerActionCmd(action, cont.FullID), true
+}
+
+func (m model) handleContainerActionDoneMsg(msg containerActionDoneMsg) (tea.Model, tea.Cmd) {
+	m.actionPending = false
+	if msg.err != nil {
+		m.actionStatus = "Error: " + msg.err.Error()
+	} else {
+		switch msg.action {
+		case "start":
+			m.actionStatus = "Container started"
+		case "stop":
+			m.actionStatus = "Container stopped"
+		case "restart":
+			m.actionStatus = "Container restarted"
+		}
+	}
 	return m, nil
 }
 
@@ -280,6 +346,10 @@ func (m model) handleLogsResultMsg(msg logs.ResultMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) handleTickMsg(_ tickMsg) (tea.Model, tea.Cmd) {
+	if m.actionStatus != "" && !m.actionPending {
+		m.actionStatus = ""
+	}
+
 	cmds := []tea.Cmd{tickCmd()}
 	if m.shouldReloadSnapshotOnTick() {
 		cmds = append(cmds, m.loadDockerCmd())

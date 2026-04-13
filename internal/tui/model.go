@@ -59,6 +59,11 @@ type loadResultMsg struct {
 
 type execDoneMsg struct{ err error }
 
+type containerActionDoneMsg struct {
+	action string // "start" | "stop" | "restart"
+	err    error
+}
+
 type model struct {
 	service         *core.Service
 	width           int
@@ -79,6 +84,8 @@ type model struct {
 	metricsLoaded   bool
 	metricsSpinner  spinner.Model
 	logsSpinner     spinner.Model
+	actionStatus    string
+	actionPending   bool
 }
 
 func New(service *core.Service) tea.Model {

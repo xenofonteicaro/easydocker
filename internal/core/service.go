@@ -12,6 +12,9 @@ type Repository interface {
 	LoadContainerMetrics(ctx context.Context, rows []ContainerRow) (map[string]ContainerMetrics, float64, uint64, error)
 	LoadContainerLiveData(ctx context.Context, containerID string, previousCPU, previousMem []float64, tail int) (ContainerLiveData, error)
 	ExecShell(ctx context.Context, containerID string, stdin io.Reader, stdout, stderr io.Writer) error
+	StartContainer(ctx context.Context, id string) error
+	StopContainer(ctx context.Context, id string) error
+	RestartContainer(ctx context.Context, id string) error
 }
 
 type ServiceConfig struct {
@@ -102,6 +105,24 @@ func (s *Service) liveDataTimeoutForTail(tail int) time.Duration {
 
 func (s *Service) ExecShell(containerID string, stdin io.Reader, stdout, stderr io.Writer) error {
 	return s.repo.ExecShell(context.Background(), containerID, stdin, stdout, stderr)
+}
+
+func (s *Service) StartContainer(id string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), s.config.RequestTimeout)
+	defer cancel()
+	return s.repo.StartContainer(ctx, id)
+}
+
+func (s *Service) StopContainer(id string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), s.config.RequestTimeout)
+	defer cancel()
+	return s.repo.StopContainer(ctx, id)
+}
+
+func (s *Service) RestartContainer(id string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), s.config.RequestTimeout)
+	defer cancel()
+	return s.repo.RestartContainer(ctx, id)
 }
 
 func (s *Service) LoadSnapshot() (Snapshot, error) {
