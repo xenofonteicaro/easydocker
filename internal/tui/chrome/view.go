@@ -77,6 +77,9 @@ var (
 		{Key: "a", Description: "toggle running/all"},
 		{Key: "enter", Description: "logs"},
 		{Key: "t", Description: "terminal"},
+		{Key: "s", Description: "start"},
+		{Key: "x", Description: "stop"},
+		{Key: "r", Description: "restart"},
 	}
 	logsFooterHelp = []FooterHelpSpec{
 		{Key: "← ↑ ↓ →", Description: "navigate"},
@@ -84,6 +87,7 @@ var (
 		{Key: "home/end", Description: "go to top/bottom"},
 		{Key: "f", Description: "toggle follow"},
 		{Key: "t", Description: "terminal"},
+		{Key: "s/x/r", Description: "start/stop/restart"},
 		{Key: "esc", Description: "back"},
 	}
 )

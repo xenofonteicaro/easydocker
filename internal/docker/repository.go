@@ -83,6 +83,30 @@ func (r *Repository) LoadSupportingResources(ctx context.Context) (core.Snapshot
 	return snapshot, nil
 }
 
+func (r *Repository) StartContainer(ctx context.Context, id string) error {
+	cli, err := r.dockerClient()
+	if err != nil {
+		return err
+	}
+	return cli.ContainerStart(ctx, id, container.StartOptions{})
+}
+
+func (r *Repository) StopContainer(ctx context.Context, id string) error {
+	cli, err := r.dockerClient()
+	if err != nil {
+		return err
+	}
+	return cli.ContainerStop(ctx, id, container.StopOptions{})
+}
+
+func (r *Repository) RestartContainer(ctx context.Context, id string) error {
+	cli, err := r.dockerClient()
+	if err != nil {
+		return err
+	}
+	return cli.ContainerRestart(ctx, id, container.StopOptions{})
+}
+
 func (r *Repository) dockerClient() (*client.Client, error) {
 	r.clientOnce.Do(func() {
 		r.client, r.clientErr = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())

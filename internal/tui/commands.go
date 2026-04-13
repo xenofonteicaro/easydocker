@@ -78,3 +78,19 @@ func (m model) loadLogsDataCmd(containerID string, sessionID int, previousCPU, p
 		return logs.ResultMsg{ContainerID: containerID, SessionID: sessionID, Data: data, Err: err, Tail: tail, Src: src}
 	}
 }
+
+func (m model) containerActionCmd(action, id string) tea.Cmd {
+	svc := m.service
+	return func() tea.Msg {
+		var err error
+		switch action {
+		case "start":
+			err = svc.StartContainer(id)
+		case "stop":
+			err = svc.StopContainer(id)
+		case "restart":
+			err = svc.RestartContainer(id)
+		}
+		return containerActionDoneMsg{action: action, err: err}
+	}
+}
